@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Neon Dodger — Mobile Controls</title>
+  <style>
+    :root{
+      --neon-green:#39ff14;
+      --neon-red:#ff3131;
+      --neon-cyan:#00ffff;
+      --neon-yellow:#ffd000;
+      --bg:#0d0221;
+      --text:#f0f0f0;
+    }
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family:'Orbitron',sans-serif; display:flex; align-items:center; justify-content:center; overflow:hidden;
+      -webkit-user-select:none; user-select:none; touch-action:manipulation;
+    }
+    #game-container{
+      position:relative; border:2px solid var(--neon-green); box-shadow:0 0 15px var(--neon-green);
+      width:min(90vw,1200px); height:min(90vh,800px);
+      background:var(--bg);
+    }
+    #gameCanvas{
+      display:block; width:100%; height:100%; background:var(--bg);
+      position:relative; z-index:0;
+    }
+    #ui-overlay{
+      pointer-events:none; position:absolute; inset:0;
+      display:flex; flex-direction:column; justify-content:space-between; align-items:center;
+      z-index:2;
+    }
+    #top-bar{
+      width:100%; box-sizing:border-box; padding:12px 20px;
+      display:flex; gap:12px; align-items:center; justify-content:space-between; font-size:1rem;
+      text-shadow:0 0 5px var(--text);
+    }
+    #status-left, #status-right{display:flex; align-items:center; gap:16px; flex-wrap:wrap}
+    .badge{
+      pointer-events:none; padding:6px 10px; border-radius:8px; border:1px solid var(--neon-cyan);
+      color:var(--bg); background:rgba(0,255,255,.15);
+      box-shadow:0 0 12px var(--neon-cyan) inset, 0 0 10px var(--neon-cyan);
+      font-weight:700; font-size:.9rem; display:none;
+    }
+    .badge.show{display:inline-block}
+    .menu{
+      pointer-events:auto; background:rgba(0,0,0,.78); padding:22px; border-radius:12px; border:1px solid var(--neon-green);
+      box-shadow:0 0 20px rgba(57,255,20,.5); display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center
+    }
+    .menu h1{margin:0; font-size:2rem; color:var(--neon-green); text-shadow:0 0 10px var(--neon-green)}
+    .menu h2{margin:.25rem 0 0; font-size:1.1rem; color:var(--neon-green)}
+    .menu ul{margin:.25rem 0 0; padding-left:1.1rem; text-align:left; line-height:1.4}
+    button{
+      pointer-events:auto; background:transparent; border:2px solid var(--neon-green);
+      color:var(--neon-green); padding:10px 20px; font:600 1rem Orbitron,sans-serif; cursor:pointer; transition:.25s; border-radius:10px
+    }
+    button:hover{background:var(--neon-green); color:var(--bg); box-shadow:0 0 16px var(--neon-green)}
+    .row{display:flex; gap:12px; flex-wrap:wrap; justify-content:center}
+    .hidden{display:none!important}
+
+    /* ------- Mobile Controls (shown only on mobile via JS) ------- */
+    #mobile-controls{
+      position:absolute; inset:0; pointer-events:none; z-index:3; /* above UI */
+      display:none; /* JS will enable on mobile only */
+    }
+    /* selector row */
+    #mobile-selector{
+      position:absolute; left:50%; transform:translateX(-50%);
+      bottom:calc(env(safe-area-inset-bottom) + 132px);
+      background:rgba(0,0,0,.55); border:1px solid var(--neon-green); border-radius:12px;
+      display:flex; gap:8px; padding:8px; pointer-events:auto;
+      box-shadow:0 0 12px rgba(57,255,20,.4);
+    }
+    #mobile-selector button{
+      padding:8px 10px; font-size:.9rem;
+    }
+    #mobile-selector .active{
+      background:var(--neon-green); color:var(--bg);
+      box-shadow:0 0 12px var(--neon-green);
+    }
+
+    /* joystick */
+    #joystick-wrap{
+      position:absolute; left:16px; bottom:calc(env(safe-area-inset-bottom) + 16px);
+      width:120px; height:120px; pointer-events:auto; touch-action:none;
+      opacity:.95;
+    }
+    .joy-base{
+      position:absolute; inset:0; border-radius:999px; border:2px solid var(--neon-cyan);
+      box-shadow:0 0 18px rgba(0,255,255,.6) inset, 0 0 12px rgba(0,255,255,.6);
+      background:rgba(0,0,0,.25);
+    }
+    .joy-stick{
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      width:56px; height:56px; border-radius:999px; border:2px solid var(--neon-green);
+      box-shadow:0 0 12px rgba(57,255,20,.9), 0 0 12px rgba(57,255,20,.4) inset;
+      background:rgba(0,0,0,.35);
+    }
+
+    /* D-pad */
+    #dpad{
+      position:absolute; left:16px; bottom:calc(env(safe-area-inset-bottom) + 16px);
+      width:160px; height:160px; pointer-events:auto; opacity:.95; display:none;
+    }
+    .dkey{
+      position:absolute; width:64px; height:64px; border-radius:12px;
+      background:rgba(0,0,0,.35); border:2px solid var(--neon-green);
+      box-shadow:0 0 10px rgba(57,255,20,.7);
+      display:flex; align-items:center; justify-content:center; font-weight:700;
+      color:var(--neon-green);
+      touch-action:none;
+    }
+    .dkey:active{background:var(--neon-green); color:var(--bg)}
+    #d-up{left:48px; top:0}
+    #d-left{left:0; top:48px}
+    #d-right{left:96px; top:48px}
+    #d-down{left:48px; top:96px}
+
+    /* Pause button for mobile */
+    #mobile-pause{
+      position:absolute; right:16px; bottom:calc(env(safe-area-inset-bottom) + 16px);
+      pointer-events:auto; opacity:.95;
+    }
+    #mobile-pause button{
+      padding:10px 16px; font-size:.95rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI overlay -->
+    <div id="ui-overlay">
+      <div id="top-bar" class="hidden">
+        <div id="status-left">
+          <span id="score">Score: 0</span>
+          <span id="timer">Time: 0.0s</span>
+          <span id="star-info">⭐ 0 • Next: —</span>
+        </div>
+        <div id="status-right">
+          <button id="speed-btn">Speed: Normal</button>
+          <span id="invincible-badge" class="badge">INVINCIBLE: 0.0s</span>
+        </div>
+      </div>
+
+      <!-- Start -->
+      <div id="start-menu" class="menu">
+        <h1>NEON DODGER</h1>
+        <p>WASD / Arrows steer, S/Down brakes. 1/2/3 set speed, <b>Space</b>/<b>Tab</b> cycle. Press <b>P</b>/<b>Esc</b> to pause.</p>
+        <p>On mobile: use the on-screen <b>Joystick</b> or <b>D-pad</b> (selector appears).</p>
+        <p>First 10s are easy. ⭐ First star at 10s, then at <i>(current invincibility + 2)s</i>.</p>
+        <button id="start-button">START</button>
+      </div>
+
+      <!-- Pause -->
+      <div id="pause-menu" class="menu hidden">
+        <h1>PAUSED</h1>
+        <h2>Controls</h2>
+        <ul>
+          <li><b>Move</b>: WASD / Arrow Keys (or on-screen controls on mobile)</li>
+          <li><b>Brake</b>: S / Arrow Down</li>
+          <li><b>Speed</b>: 1=Slow, 2=Normal, 3=Fast, Space/Tab cycle</li>
+          <li><b>Pause / Resume</b>: P or Esc (or pause button on mobile)</li>
+          <li><b>Goal</b>: Survive; score ticks up (×2 during invincibility). Near-miss for bonus.</li>
+        </ul>
+        <div class="row">
+          <button id="resume-button">RESUME</button>
+          <button id="pause-restart-button">RESTART</button>
+        </div>
+      </div>
+
+      <!-- Over -->
+      <div id="game-over-menu" class="menu hidden">
+        <h1>GAME OVER</h1>
+        <p id="final-time">Survived: 0.0s</p>
+        <p id="final-score">Final Score: 0</p>
+        <button id="restart-button">PLAY AGAIN</button>
+      </div>
+    </div>
+
+    <!-- MOBILE CONTROLS (created but hidden on desktop) -->
+    <div id="mobile-controls">
+      <!-- scheme selector -->
+      <div id="mobile-selector">
+        <button id="sel-joy" class="active">Joystick</button>
+        <button id="sel-dpad">D-pad</button>
+      </div>
+
+      <!-- Joystick -->
+      <div id="joystick-wrap">
+        <div class="joy-base"></div>
+        <div class="joy-stick" id="joy-stick"></div>
+      </div>
+
+      <!-- D-Pad -->
+      <div id="dpad">
+        <div class="dkey" id="d-up">▲</div>
+        <div class="dkey" id="d-left">◀</div>
+        <div class="dkey" id="d-right">▶</div>
+        <div class="dkey" id="d-down">▼</div>
+      </div>
+
+      <!-- Pause on mobile -->
+      <div id="mobile-pause"><button id="pause-btn">PAUSE</button></div>
+    </div>
+  </div>
+
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  /* ================== DESKTOP/MOBILE DETECTION ================== */
+  const isCoarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const isMobileUA = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isMobile = isCoarse || isMobileUA;
+
+  /* ================== CANVAS & UI ================== */
+  const canvas=document.getElementById('gameCanvas'), ctx=canvas.getContext('2d');
+  const ui={
+    bar:document.getElementById('top-bar'),
+    score:document.getElementById('score'),
+    timer:document.getElementById('timer'),
+    starInfo:document.getElementById('star-info'),
+    speedBtn:document.getElementById('speed-btn'),
+    invBadge:document.getElementById('invincible-badge'),
+    startMenu:document.getElementById('start-menu'),
+    pauseMenu:document.getElementById('pause-menu'),
+    overMenu:document.getElementById('game-over-menu'),
+    finalScore:document.getElementById('final-score'),
+    finalTime:document.getElementById('final-time'),
+    startBtn:document.getElementById('start-button'),
+    resumeBtn:document.getElementById('resume-button'),
+    pauseRestartBtn:document.getElementById('pause-restart-button'),
+    restartBtn:document.getElementById('restart-button'),
+  };
+
+  function resize(){
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+    canvas.style.width = rect.width + "px";
+    canvas.style.height = rect.height + "px";
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize',resize,{passive:true}); resize();
+
+  /* ================== AUDIO ================== */
+  let actx=null;
+  function ensureAudio(){
+    if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch{} }
+    if(actx && actx.state==='suspended') actx.resume();
+  }
+  function ping(freq=880, dur=0.12, gain=0.15){
+    if(!actx) return;
+    const t=actx.currentTime;
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(freq,t);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(gain,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t+dur+0.05);
+  }
+  function pickup(){
+    if(!actx) return;
+    const t=actx.currentTime;
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type='triangle'; o.frequency.setValueAtTime(660,t); o.frequency.exponentialRampToValueAtTime(1100,t+0.2);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.2,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.25);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t+0.3);
+  }
+
+  /* ================== CONFIG & HELPERS ================== */
+  const EASY_SECS = 10, TARGET_DURATION = 90;
+  const NEAR_MISS_RADIUS = 50, NEAR_MISS_MIN = 25, NEAR_MISS_MAX = 150;
+  const STAR_SPEED = 140;
+  const MAX_SPEED_BASE = 520;
+
+  const speedModes=[{name:'Slow',mult:0.6},{name:'Normal',mult:1.0},{name:'Fast',mult:2.25}];
+  let currentMode=1;
+  function setSpeedMode(idx){
+    currentMode = ((idx%speedModes.length)+speedModes.length)%speedModes.length;
+    ui.speedBtn.textContent = `Speed: ${speedModes[currentMode].name}`;
+  }
+  setSpeedMode(1);
+  ui.speedBtn.addEventListener('click', ()=> setSpeedMode(currentMode+1));
+
+  function spawnIntervalFor(t){ if(t<EASY_SECS) return 1100; return Math.max(140,700-(t-EASY_SECS)*18); }
+  function obstacleSpeedFor(t){ if(t<EASY_SECS) return 60 + t*4; return 100 + (t-EASY_SECS)*14; }
+  function aimNoiseFor(t){ return Math.min(0.9, 0.35 + t * 0.01); }
+
+  // Spiky vs gradual
+  const SPIKE_OBS_PROB = 0.25;
+  function baselineObstacleSpeed(t){ if(t<EASY_SECS) return 60 + t*2; const x=t-EASY_SECS; return 90 + 100*(1-Math.exp(-x/12)); }
+  function gradualAccelPerSecond(t){ if(t<EASY_SECS) return 0; const x=t-EASY_SECS; return Math.min(0.08, 0.03 + 0.003*x); }
+
+  class Vec { constructor(x=0,y=0){this.x=x;this.y=y;} add(v){this.x+=v.x;this.y+=v.y;return this;} scale(s){this.x*=s;this.y*=s;return this;} copy(){return new Vec(this.x,this.y);} set(x,y){this.x=x;this.y=y;return this;} }
+  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+  const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+  const rand=(min,max)=>Math.random()*(max-min)+min;
+  const cssVar = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  /* ================== INPUT (Keyboard + Mobile emulation) ================== */
+  // Master key state used by the game loop:
+  const keys={ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false,w:false,a:false,s:false,d:false};
+
+  // Keyboard
+  window.addEventListener('keydown',e=>{
+    if(e.key in keys) keys[e.key]=true;
+    if(e.key==='1') setSpeedMode(0);
+    if(e.key==='2') setSpeedMode(1);
+    if(e.key==='3') setSpeedMode(2);
+    if(e.key==='Tab'){ e.preventDefault(); setSpeedMode(currentMode+1); }
+    if(e.code==='Space'){ e.preventDefault(); if(!e.repeat) setSpeedMode(currentMode+1); }
+    if(e.key==='p' || e.key==='P' || e.key==='Escape'){ togglePause(); }
+  });
+  window.addEventListener('keyup',e=>{ if(e.key in keys) keys[e.key]=false; });
+
+  // Mobile controls (only enabled on mobile)
+  const mobileUI = {
+    root: document.getElementById('mobile-controls'),
+    selJoy: document.getElementById('sel-joy'),
+    selDpad: document.getElementById('sel-dpad'),
+    joyWrap: document.getElementById('joystick-wrap'),
+    joyStick: document.getElementById('joy-stick'),
+    dpad: document.getElementById('dpad'),
+    up: document.getElementById('d-up'),
+    left: document.getElementById('d-left'),
+    right: document.getElementById('d-right'),
+    down: document.getElementById('d-down'),
+    pauseBtn: document.getElementById('pause-btn'),
+    selector: document.getElementById('mobile-selector'),
+  };
+
+  const SCHEME_KEY = 'nd_control_scheme';
+  let controlScheme = localStorage.getItem(SCHEME_KEY) || 'joystick'; // 'joystick'|'dpad'
+
+  if(isMobile){
+    mobileUI.root.style.display = 'block';
+    setScheme(controlScheme);
+    setupJoystick();
+    setupDpad();
+    mobileUI.pauseBtn.addEventListener('click', ()=> togglePause());
+    mobileUI.selJoy.addEventListener('click', ()=> setScheme('joystick'));
+    mobileUI.selDpad.addEventListener('click', ()=> setScheme('dpad'));
+  } else {
+    // ensure invisible on desktop, always
+    mobileUI.root.style.display = 'none';
+  }
+
+  function setScheme(s){
+    controlScheme = s;
+    localStorage.setItem(SCHEME_KEY, s);
+    mobileUI.selJoy.classList.toggle('active', s==='joystick');
+    mobileUI.selDpad.classList.toggle('active', s==='dpad');
+    mobileUI.joyWrap.style.display = (s==='joystick') ? 'block' : 'none';
+    mobileUI.dpad.style.display    = (s==='dpad') ? 'block' : 'none';
+  }
+
+  // ---- Joystick (emulates ArrowUp/Down/Left/Right) ----
+  function setupJoystick(){
+    const wrap = mobileUI.joyWrap, stick = mobileUI.joyStick;
+    const center = { x: wrap.clientWidth/2, y: wrap.clientHeight/2 };
+    const maxR = wrap.clientWidth/2 - 6; // inner radius for stick travel
+    let active = false;
+
+    const setFromVector = (dx, dy)=>{
+      // Normalize
+      const mag = Math.hypot(dx,dy);
+      const nx = mag ? dx/mag : 0;
+      const ny = mag ? dy/mag : 0;
+
+      // Thresholds (dead zone)
+      const dead = 0.2;
+      const left  = nx < -dead, right = nx > dead;
+      const up    = ny < -dead;      // up on screen is negative y
+      const down  = ny > dead;
+
+      // Set key states (Arrow keys only; game also accepts WASD but no need here)
+      keys.ArrowLeft  = left;
+      keys.ArrowRight = right;
+      keys.ArrowUp    = up;
+      keys.ArrowDown  = down;
+    };
+
+    const reset = ()=>{
+      active=false;
+      stick.style.transform = `translate(-50%,-50%)`;
+      setFromVector(0,0);
+    };
+
+    function handleStart(ev){
+      ev.preventDefault();
+      active = true;
+      const t = ev.changedTouches ? ev.changedTouches[0] : ev;
+      update(t);
+    }
+    function handleMove(ev){
+      if(!active) return;
+      ev.preventDefault();
+      const t = ev.changedTouches ? ev.changedTouches[0] : ev;
+      update(t);
+    }
+    function handleEnd(ev){
+      if(!active) return;
+      ev.preventDefault();
+      reset();
+    }
+
+    function update(point){
+      const rect = wrap.getBoundingClientRect();
+      const x = point.clientX - rect.left;
+      const y = point.clientY - rect.top;
+      let dx = x - center.x, dy = y - center.y;
+
+      // clamp to circle
+      const mag = Math.hypot(dx,dy);
+      if (mag > maxR){ dx *= maxR/mag; dy *= maxR/mag; }
+
+      // move stick
+      stick.style.transform = `translate(${dx}px, ${dy}px)`;
+
+      // convert to key intent
+      setFromVector(dx/maxR, dy/maxR);
+    }
+
+    // Pointer/touch listeners
+    wrap.addEventListener('touchstart',handleStart,{passive:false});
+    wrap.addEventListener('touchmove', handleMove ,{passive:false});
+    wrap.addEventListener('touchend',  handleEnd  ,{passive:false});
+    wrap.addEventListener('touchcancel',handleEnd ,{passive:false});
+
+    // (Optional) mouse support for simulators
+    wrap.addEventListener('mousedown',handleStart);
+    window.addEventListener('mousemove',handleMove);
+    window.addEventListener('mouseup',handleEnd);
+  }
+
+  // ---- D-pad (press & hold -> key true; release -> key false) ----
+  function setupDpad(){
+    const bindHold = (el, key)=>{
+      const setTrue = e=>{ e.preventDefault(); keys[key]=true; };
+      const setFalse= e=>{ e.preventDefault(); keys[key]=false; };
+      el.addEventListener('touchstart',setTrue,{passive:false});
+      el.addEventListener('touchend',setFalse,{passive:false});
+      el.addEventListener('touchcancel',setFalse,{passive:false});
+      // fallback mouse for emulators
+      el.addEventListener('mousedown',setTrue);
+      el.addEventListener('mouseup',setFalse);
+      el.addEventListener('mouseleave',setFalse);
+    };
+    bindHold(mobileUI.up,'ArrowUp');
+    bindHold(mobileUI.left,'ArrowLeft');
+    bindHold(mobileUI.right,'ArrowRight');
+    bindHold(mobileUI.down,'ArrowDown');
+  }
+
+  /* ================== GEOMETRY (accurate triangle collisions) ================== */
+  const dot=(a,b)=>a.x*b.x + a.y*b.y;
+  function rotatePoint(px, py, ox, oy, ang){
+    const s=Math.sin(ang), c=Math.cos(ang);
+    const x=px-ox, y=py-oy;
+    return {x: x*c - y*s + ox, y: x*s + y*c + oy};
+  }
+  function triVerts(ship){
+    const s = ship.size;
+    const A = {x:0, y:-s};
+    const B = {x:-s/1.5, y:s/2};
+    const C = {x:s/1.5, y:s/2};
+    const ang = ship.angle + Math.PI/2;
+    const p = ship.pos;
+    return [
+      rotatePoint(A.x, A.y, 0, 0, ang),
+      rotatePoint(B.x, B.y, 0, 0, ang),
+      rotatePoint(C.x, C.y, 0, 0, ang),
+    ].map(v=>({x:v.x + p.x, y:v.y + p.y}));
+  }
+  function pointInTri(p, a,b,c){
+    const s1 = (p.x - c.x)*(a.y - c.y) - (a.x - c.x)*(p.y - c.y);
+    const s2 = (p.x - a.x)*(b.y - a.y) - (b.x - a.x)*(p.y - a.y);
+    const s3 = (p.x - b.x)*(c.y - b.y) - (c.x - b.x)*(p.y - b.y);
+    const hasNeg = (s1<0)||(s2<0)||(s3<0);
+    const hasPos = (s1>0)||(s2>0)||(s3>0);
+    return !(hasNeg && hasPos) || s1===0 || s2===0 || s3===0;
+  }
+  function pointInRect(p, rx, ry, rw, rh){
+    return p.x >= rx && p.x <= rx+rw && p.y >= ry && p.y <= ry+rh;
+  }
+  function segmentsIntersect(p1,p2,q1,q2){
+    function orient(a,b,c){ return (b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x); }
+    function onSeg(a,b,c){ return Math.min(a.x,c.x) <= b.x && b.x <= Math.max(a.x,c.x) &&
+                                 Math.min(a.y,c.y) <= b.y && b.y <= Math.max(a.y,c.y); }
+    const o1 = orient(p1,p2,q1), o2 = orient(p1,p2,q2), o3 = orient(q1,q2,p1), o4 = orient(q1,q2,p2);
+    if (o1===0 && onSeg(p1,q1,p2)) return true;
+    if (o2===0 && onSeg(p1,q2,p2)) return true;
+    if (o3===0 && onSeg(q1,p1,q2)) return true;
+    if (o4===0 && onSeg(q1,p2,q2)) return true;
+    return (o1>0)!==(o2>0) && (o3>0)!==(o4>0);
+  }
+  function distPointSegSq(p, a, b){
+    const ab = {x:b.x-a.x, y:b.y-a.y};
+    const ap = {x:p.x-a.x, y:p.y-a.y};
+    const ab2 = ab.x*ab.x + ab.y*ab.y;
+    const t = ab2 ? clamp((ap.x*ab.x + ap.y*ab.y)/ab2, 0, 1) : 0;
+    const proj = {x: a.x + ab.x*t, y: a.y + ab.y*t};
+    const dx = p.x - proj.x, dy = p.y - proj.y;
+    return dx*dx + dy*dy;
+  }
+  function triCircleCollide(verts, center, radius){
+    const r2 = radius*radius;
+    for (const v of verts){ const dx=v.x-center.x, dy=v.y-center.y; if (dx*dx+dy*dy <= r2) return true; }
+    if (pointInTri(center, verts[0],verts[1],verts[2])) return true;
+    for (let i=0;i<3;i++){
+      const a=verts[i], b=verts[(i+1)%3];
+      if (distPointSegSq(center, a, b) <= r2) return true;
+    }
+    return false;
+  }
+  function triRectCollide(verts, rx, ry, rw, rh){
+    for (const v of verts){ if (pointInRect(v, rx,ry,rw,rh)) return true; }
+    const rectPts = [
+      {x:rx, y:ry},{x:rx+rw, y:ry},
+      {x:rx+rw, y:ry+rh},{x:rx, y:ry+rh}
+    ];
+    for (const p of rectPts){ if (pointInTri(p, verts[0],verts[1],verts[2])) return true; }
+    const triEdges = [[verts[0],verts[1]],[verts[1],verts[2]],[verts[2],verts[0]]];
+    const rectEdges = [
+      [rectPts[0],rectPts[1]],[rectPts[1],rectPts[2]],[rectPts[2],rectPts[3]],[rectPts[3],rectPts[0]]
+    ];
+    for (const [a,b] of triEdges){
+      for (const [c,d] of rectEdges){
+        if (segmentsIntersect(a,b,c,d)) return true;
+      }
+    }
+    return false;
+  }
+
+  /* ================== PLAYER (ship + trail) ================== */
+  const SHIP_SIZE = 12, BASE_THRUST = 240, BASE_BRAKE  = 0.7*BASE_THRUST, DAMPING = 2.5;
+  const TRAIL_MAX_POINTS = 28, TRAIL_MIN_SPEED = 20, TRAIL_SAMPLE_MS = 18;
+
+  let invincibleUntil = 0, graceUntil = 0, timeSlowUntil = 0, timeScale = 1;
+
+  const player = {
+    pos:new Vec(), vel:new Vec(), angle:-Math.PI/2, size:SHIP_SIZE,
+    trail:[], lastTrailSample:0,
+    reset(){
+      const w = canvas.width / (window.devicePixelRatio||1);
+      const h = canvas.height / (window.devicePixelRatio||1);
+      this.pos = new Vec(w/2,h/2); this.vel = new Vec(0,0); this.angle = -Math.PI/2;
+      this.trail = []; this.lastTrailSample = 0;
+      invincibleUntil = 0; graceUntil = performance.now() + 800; timeSlowUntil = 0; timeScale = 1;
+    },
+    update(dt, now){
+      const modeMult = speedModes[currentMode].mult;
+      const baseTurn = 3.8;
+      const turn = baseTurn * (0.95 + 0.35 * modeMult) * dt;
+      if(keys.ArrowLeft||keys.a) this.angle -= turn;
+      if(keys.ArrowRight||keys.d) this.angle += turn;
+
+      const thrust = BASE_THRUST * modeMult;
+      const brake  = BASE_BRAKE  * modeMult;
+      const ax = Math.cos(this.angle) * thrust;
+      const ay = Math.sin(this.angle) * thrust;
+      if(keys.ArrowUp||keys.w)   this.vel.add(new Vec(ax*dt, ay*dt));
+      if(keys.ArrowDown||keys.s) this.vel.add(new Vec(-Math.cos(this.angle)*brake*dt,-Math.sin(this.angle)*brake*dt));
+
+      const decay = Math.exp(-DAMPING*dt);
+      this.vel.scale(decay);
+
+      if (MAX_SPEED_BASE > 0) {
+        const vmax = MAX_SPEED_BASE * modeMult;
+        const v = Math.hypot(this.vel.x, this.vel.y);
+        if (v > vmax) { const s = vmax / (v || 1); this.vel.x *= s; this.vel.y *= s; }
+      }
+
+      this.pos.add(this.vel.copy().scale(dt));
+
+      const w = canvas.width / (window.devicePixelRatio||1);
+      const h = canvas.height / (window.devicePixelRatio||1);
+      const mrg = this.size;
+      if (this.pos.x > w + mrg) this.pos.x = -mrg; else if (this.pos.x < -mrg) this.pos.x = w + mrg;
+      if (this.pos.y > h + mrg) this.pos.y = -mrg; else if (this.pos.y < -mrg) this.pos.y = h + mrg;
+
+      const speed = Math.hypot(this.vel.x, this.vel.y);
+      if (speed > TRAIL_MIN_SPEED && (now - this.lastTrailSample) >= TRAIL_SAMPLE_MS) {
+        this.trail.push({x:this.pos.x, y:this.pos.y});
+        if (this.trail.length > TRAIL_MAX_POINTS) this.trail.shift();
+        this.lastTrailSample = now;
+      }
+    },
+    drawTrail(){
+      if (this.trail.length < 2) return;
+      const green = cssVar('--neon-green') || 'lime';
+      for (let i = 1; i < this.trail.length; i++) {
+        const a = this.trail[i-1], b = this.trail[i];
+        const t = i / this.trail.length;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 12 * t;
+        ctx.shadowColor = green;
+        ctx.strokeStyle = green;
+        ctx.globalAlpha = 0.15 + 0.55 * t;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
+    },
+    drawShip(now){
+      ctx.save();
+      ctx.translate(this.pos.x, this.pos.y);
+      ctx.rotate(this.angle + Math.PI/2);
+      ctx.beginPath();
+      ctx.moveTo(0, -this.size);
+      ctx.lineTo(-this.size/1.5, this.size/2);
+      ctx.lineTo(this.size/1.5, this.size/2);
+      ctx.closePath();
+
+      const inv = now < invincibleUntil;
+      if (inv) {
+        const pulse = 0.7 + 0.3*Math.sin(now/120);
+        ctx.lineWidth = 2 + 1.5*pulse;
+        ctx.shadowBlur = 18 + 10*pulse;
+        ctx.shadowColor = cssVar('--neon-cyan') || '#00ffff';
+        ctx.strokeStyle = cssVar('--neon-cyan') || '#00ffff';
+      } else {
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = cssVar('--neon-green') || 'lime';
+        ctx.strokeStyle = cssVar('--neon-green') || 'lime';
+      }
+      ctx.stroke(); ctx.shadowBlur = 0; ctx.restore();
+    },
+    draw(now){ this.drawTrail(); this.drawShip(now); }
+  };
+
+  /* ================== OBSTACLES ================== */
+  let obstacles = [];
+  function spawnObstacle(){
+    const dpr = window.devicePixelRatio||1;
+    const w = canvas.width/dpr, h = canvas.height/dpr;
+
+    const edge = Math.floor(Math.random()*4);
+    let pos = new Vec();
+    switch(edge){
+      case 0: pos = new Vec(rand(0,w), -12); break;
+      case 1: pos = new Vec(w+12, rand(0,h)); break;
+      case 2: pos = new Vec(rand(0,w), h+12); break;
+      case 3: pos = new Vec(-12, rand(0,h)); break;
+    }
+    const center = new Vec(w/2,h/2);
+    const ang = Math.atan2(center.y-pos.y, center.x-pos.x) + rand(-aimNoiseFor(elapsed), aimNoiseFor(elapsed));
+
+    const isSpike = Math.random() < SPIKE_OBS_PROB;
+    const speed = isSpike ? obstacleSpeedFor(elapsed) : baselineObstacleSpeed(elapsed);
+    const vel = new Vec(Math.cos(ang) * speed, Math.sin(ang) * speed);
+
+    const shape = Math.random()<0.5 ? 'circle' : 'rect';
+    if (shape==='circle'){
+      const r = rand(8, SHIP_SIZE);
+      obstacles.push({shape,pos,vel,r,near:false,spike:isSpike});
+    } else {
+      const ow = rand(8, SHIP_SIZE);
+      const oh = rand(8, SHIP_SIZE);
+      obstacles.push({shape,pos,vel,w:ow,h:oh,near:false,spike:isSpike});
+    }
+  }
+  function drawObstacle(o){
+    const red = cssVar('--neon-red') || 'red';
+    ctx.lineWidth = 2; ctx.shadowBlur = 16; ctx.shadowColor = red; ctx.strokeStyle = red;
+    ctx.beginPath();
+    if (o.shape==='circle') ctx.arc(o.pos.x,o.pos.y,o.r,0,Math.PI*2);
+    else ctx.rect(o.pos.x - o.w/2, o.pos.y - o.h/2, o.w, o.h);
+    ctx.stroke(); ctx.shadowBlur = 0;
+  }
+  function updateObstacles(dt){
+    const dpr = window.devicePixelRatio||1;
+    const w = canvas.width/dpr, h = canvas.height/dpr;
+    const shipTri = triVerts(player);
+
+    for (let i=obstacles.length-1;i>=0;i--){
+      const o = obstacles[i];
+      o.pos.add(o.vel.copy().scale(dt));
+
+      if (!o.spike) {
+        const accel = gradualAccelPerSecond(elapsed);
+        if (accel > 0) o.vel.scale(1 + accel * dt);
+      }
+
+      // accurate first-touch collision
+      let hit = false;
+      const nowt = performance.now();
+      if (nowt >= invincibleUntil && nowt >= graceUntil) {
+        if (o.shape==='circle'){
+          hit = triCircleCollide(shipTri, o.pos, o.r);
+        } else {
+          const rx = o.pos.x - o.w/2, ry = o.pos.y - o.h/2;
+          hit = triRectCollide(shipTri, rx, ry, o.w, o.h);
+        }
+      }
+      if (hit){ setState('over'); return true; }
+
+      // near-miss (if not hit)
+      if (!o.near){
+        const d = dist(player.pos, o.pos);
+        if (d < NEAR_MISS_RADIUS){
+          const t = clamp(1 - d/NEAR_MISS_RADIUS, 0, 1);
+          const bonus = Math.round(NEAR_MISS_MIN + t*(NEAR_MISS_MAX-NEAR_MISS_MIN));
+          score += bonus; o.near = true;
+        }
+      }
+
+      const margin=64;
+      if (o.pos.x<-margin||o.pos.x>w+margin||o.pos.y<-margin||o.pos.y>h+margin) obstacles.splice(i,1);
+    }
+    return false;
+  }
+
+  /* ================== POWER-UPS (Stars) ================== */
+  const POWER_LIFETIME_MS = 10_000, BASE_INVINCIBLE_MS = 5_000;
+  const STAR_OUTER = 10, STAR_INNER = 4.5;
+  let powerUps = [], starCountCollected = 0, lastInvDurationMs = 0, nextStarAtMs = 0, pulseRings = [];
+
+  function scheduleFirstStar(startTimeMs){ nextStarAtMs = startTimeMs + EASY_SECS * 1000; }
+  function scheduleNextStar(fromTimeMs){
+    const nSeconds = lastInvDurationMs / 1000;
+    nextStarAtMs = fromTimeMs + (nSeconds + 2) * 1000;
+  }
+  function spawnPulse(pos){
+    pulseRings.push({pos: {x:pos.x, y:pos.y}, born: performance.now(), dur: 600});
+    ping(880, 0.12, 0.12);
+  }
+  function maybeSpawnStar(now){
+    if (powerUps.length > 0) return;
+    if (now < nextStarAtMs) return;
+
+    const dpr = window.devicePixelRatio||1;
+    const w = canvas.width/dpr, h = canvas.height/dpr;
+    const edge = Math.floor(Math.random()*4);
+    let pos = new Vec();
+    switch(edge){
+      case 0: pos = new Vec(rand(0,w), -12); break;
+      case 1: pos = new Vec(w+12, rand(0,h)); break;
+      case 2: pos = new Vec(rand(0,w), h+12); break;
+      case 3: pos = new Vec(-12, rand(0,h)); break;
+    }
+    const center = new Vec(w/2,h/2);
+    const ang = Math.atan2(center.y-pos.y, center.x-pos.x) + rand(-0.4,0.4);
+    const vel = new Vec(Math.cos(ang)*STAR_SPEED, Math.sin(ang)*STAR_SPEED);
+
+    powerUps.push({ pos, vel, born: now, rOuter: STAR_OUTER, rInner: STAR_INNER });
+    spawnPulse(pos);
+  }
+  function drawStar(x, y, rOuter, rInner, points=5, fillStyle='#ffd000'){
+    const step = Math.PI / points;
+    ctx.beginPath();
+    for (let i = 0; i < 2 * points; i++){
+      const r = (i % 2 === 0) ? rOuter : rInner;
+      const a = i * step - Math.PI / 2;
+      ctx.lineTo(x + Math.cos(a)*r, y + Math.sin(a)*r);
+    }
+    ctx.closePath();
+    ctx.fillStyle = fillStyle;
+    ctx.shadowBlur = 18; ctx.shadowColor = cssVar('--neon-yellow') || '#ffd000';
+    ctx.globalCompositeOperation = 'source-over'; ctx.fill(); ctx.shadowBlur = 0;
+  }
+  function updatePowerUps(dt, now){
+    const dpr = window.devicePixelRatio||1;
+    const w = canvas.width/dpr, h = canvas.height/dpr;
+    const shipTri = triVerts(player);
+
+    for (let i = powerUps.length - 1; i >= 0; i--){
+      const p = powerUps[i];
+      p.pos.add(p.vel.copy().scale(dt));
+
+      if (now - p.born > POWER_LIFETIME_MS){
+        powerUps.splice(i,1); scheduleNextStar(now); continue;
+      }
+
+      if (triCircleCollide(shipTri, p.pos, p.rOuter)){
+        ensureAudio(); pickup();
+        starCountCollected += 1;
+        lastInvDurationMs = BASE_INVINCIBLE_MS * starCountCollected; // 5s, 10s, 15s, ...
+        invincibleUntil = now + lastInvDurationMs;
+        timeSlowUntil = now + 300; timeScale = 0.8; graceUntil = now + 800;
+
+        powerUps.splice(i,1); scheduleNextStar(now);
+      }
+
+      const margin=64;
+      if (p && (p.pos.x<-margin||p.pos.x>w+margin||p.pos.y<-margin||p.pos.y>h+margin)){
+        powerUps.splice(i,1); scheduleNextStar(now);
+      }
+    }
+  }
+  function drawPowerUps(){
+    const yellow = cssVar('--neon-yellow') || '#ffd000';
+    for (const p of powerUps){ drawStar(p.pos.x, p.pos.y, p.rOuter, p.rInner, 5, yellow); }
+  }
+  function drawPulses(now){
+    const col = cssVar('--neon-yellow') || '#ffd000';
+    for (let i=pulseRings.length-1;i>=0;i--){
+      const r = pulseRings[i];
+      const t = clamp((now - r.born)/r.dur, 0, 1);
+      if (t>=1){ pulseRings.splice(i,1); continue; }
+      const radius = 10 + t*40;
+      ctx.beginPath();
+      ctx.arc(r.pos.x, r.pos.y, radius, 0, Math.PI*2);
+      ctx.lineWidth = 2; ctx.shadowBlur = 18; ctx.shadowColor = col; ctx.strokeStyle = col;
+      ctx.globalAlpha = 1 - t; ctx.globalCompositeOperation = 'lighter';
+      ctx.stroke(); ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+
+  /* ================== GAME FLOW ================== */
+  let gameState='waiting', score=0, startTime=0, lastSpawnAt=0, lastFrame=0, elapsed=0;
+
+  let isPaused = false, pauseBeganAt = 0;
+  function togglePause(){ isPaused ? resumeGame() : pauseGame(); }
+  function pauseGame(){
+    if (gameState!=='playing' || isPaused) return;
+    isPaused = true; pauseBeganAt = performance.now();
+    ui.pauseMenu.classList.remove('hidden');
+  }
+  function resumeGame(){
+    if (!isPaused) return;
+    const now = performance.now(); const delta = now - pauseBeganAt; isPaused = false;
+    ui.pauseMenu.classList.add('hidden');
+    startTime += delta;
+    if (invincibleUntil>0) invincibleUntil += delta;
+    if (graceUntil>0) graceUntil += delta;
+    if (timeSlowUntil>0) timeSlowUntil += delta;
+    if (nextStarAtMs>0) nextStarAtMs += delta;
+    if (lastSpawnAt>0) lastSpawnAt += delta;
+    for (const p of powerUps) p.born += delta;
+    for (const r of pulseRings) r.born += delta;
+    lastFrame = now;
+  }
+  function setState(s){
+    gameState=s;
+    ui.bar.classList.add('hidden'); ui.startMenu.classList.add('hidden'); ui.pauseMenu.classList.add('hidden'); ui.overMenu.classList.add('hidden');
+    if(s==='waiting') ui.startMenu.classList.remove('hidden');
+    if(s==='playing'){ ui.bar.classList.remove('hidden'); startGame(); }
+    if(s==='over'){
+      ui.overMenu.classList.remove('hidden');
+      ui.finalScore.textContent = `Final Score: ${Math.floor(score)}`;
+      ui.finalTime.textContent  = `Survived: ${elapsed.toFixed(1)}s`;
+    }
+  }
+  function startGame(){
+    ensureAudio();
+    player.reset(); obstacles.length = 0; powerUps.length = 0; pulseRings.length = 0;
+    score = 0; isPaused = false;
+    startTime = performance.now(); lastSpawnAt = startTime; lastFrame = 0; elapsed = 0;
+    starCountCollected = 0; lastInvDurationMs  = 0; scheduleFirstStar(startTime);
+    requestAnimationFrame(loop);
+  }
+  function loop(now){
+    if (gameState!=='playing') return;
+    if (isPaused){ requestAnimationFrame(loop); return; }
+
+    if (!lastFrame) lastFrame = now || performance.now();
+    timeScale = (now < timeSlowUntil) ? 0.8 : 1.0;
+
+    const dtReal = Math.min(0.05, (now - lastFrame)/1000);
+    const dt = dtReal * timeScale;
+    lastFrame = now;
+    elapsed = (now - startTime) / 1000;
+
+    if (elapsed >= TARGET_DURATION) { setState('over'); return; }
+
+    const spawnInterval = spawnIntervalFor(elapsed);
+    if (now - lastSpawnAt >= spawnInterval) { spawnObstacle(); lastSpawnAt = now; }
+    maybeSpawnStar(now);
+
+    player.update(dt, now);
+    if (updateObstacles(dt)) return;
+    updatePowerUps(dt, now);
+
+    const mult = (now < invincibleUntil) ? 2 : 1;
+    score += 10 * dt * mult;
+
+    const dpr = window.devicePixelRatio||1;
+    const w = canvas.width/dpr, h = canvas.height/dpr;
+    ctx.clearRect(0,0,w,h);
+    player.draw(now);
+    for (const o of obstacles) drawObstacle(o);
+    drawPowerUps();
+    drawPulses(now);
+
+    ui.score.textContent = `Score: ${Math.floor(score)}`;
+    ui.timer.textContent  = `Time: ${elapsed.toFixed(1)}s`;
+
+    if (now < invincibleUntil){
+      const remain = (invincibleUntil - now) / 1000;
+      ui.invBadge.textContent = `INVINCIBLE: ${remain.toFixed(1)}s (x2 score)`;
+      ui.invBadge.classList.add('show');
+    } else {
+      ui.invBadge.classList.remove('show');
+    }
+
+    const eta = Math.max(0, (nextStarAtMs - now)/1000);
+    ui.starInfo.textContent = `⭐ ${starCountCollected} • Next: ${eta.toFixed(1)}s`;
+
+    requestAnimationFrame(loop);
+  }
+
+  // Buttons
+  ui.startBtn.addEventListener('click', ()=> setState('playing'));
+  ui.restartBtn.addEventListener('click', ()=> setState('playing'));
+  ui.resumeBtn.addEventListener('click', ()=> resumeGame());
+  ui.pauseRestartBtn.addEventListener('click', ()=> { isPaused=false; setState('playing'); });
+  ui.speedBtn.addEventListener('click', ()=> setSpeedMode(currentMode+1));
+
+  setState('waiting');
+});
+</script>
+</body>
+</html>
